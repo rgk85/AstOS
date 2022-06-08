@@ -75,7 +75,7 @@ def main(args):
         os.system("mkdir /mnt/boot/efi")
         os.system(f"mount {args[3]} /mnt/boot/efi")
 
-    os.system("pacstrap /mnt base-devel linux linux-firmware linux-firmware-marvell nano git htop intel-ucode reflector mesa networkmanager base btrfs-progs grub python3 python-anytree")
+    os.system("pacstrap /mnt base-devel linux linux-firmware linux-firmware-marvell nano git htop intel-ucode reflector mesa networkmanager base btrfs-progs grub python3 python-anytree openssh xdg-user-dirs")
 
     if efi:
         os.system("pacstrap /mnt efibootmgr")
@@ -142,6 +142,8 @@ def main(args):
             os.system("arch-chroot /mnt passwd")
 
     os.system("arch-chroot /mnt systemctl enable NetworkManager")
+    os.system("arch-chroot /mnt systemctl enable sshd.service")
+    
     os.system("mkdir -p /mnt/.snapshots/{ast,boot,etc,rootfs,var}")
     os.system("echo {\\'name\\': \\'root\\', \\'children\\': [{\\'name\\': \\'0\\'}]} > /mnt/.snapshots/ast/fstree")
 
