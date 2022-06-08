@@ -62,7 +62,7 @@ def main(args):
             clear()
             # pactrap welcome message
             print(f'Base Packages.\n\n')
-            print(f'Some mandatory packages are included by default, they're necessary for astOS to function.')
+            print(f'Some mandatory packages are included by default, they\'re necessary for astOS to function.')
             print(f'Value: {pacstrapOptionsMandatory}\n\n')
             print(f'Default packages, you can override those here if you wish to do so.')
             print(f'Value: {pacstrapOptions}\n\n')           
@@ -99,7 +99,7 @@ def main(args):
 
     # update pacman and installation
     os.system("pacman -S --noconfirm archlinux-keyring")
-    os.system("pacman --noconfirm -Sy")
+    #os.system("pacman --noconfirm -Sy")
     
     # set btrfs format on root partition
     os.system(f"mkfs.btrfs -f {args[1]}")
@@ -157,20 +157,6 @@ def main(args):
     if efi:
         os.system(f"echo 'UUID=\"{to_uuid(args[3])}\" /boot/efi vfat umask=0077 0 2' >> /mnt/etc/fstab")
 
-    # ast configuration
-    os.system("echo '/.snapshots/ast/root /root none bind 0 0' >> /mnt/etc/fstab")
-    os.system("echo '/.snapshots/ast/tmp /tmp none bind 0 0' >> /mnt/etc/fstab")
-    astpart = to_uuid(args[1])
-    os.system(f"mkdir -p /mnt/usr/share/ast/db")
-    os.system(f"echo '0' > /mnt/usr/share/ast/snap")
-    os.system("mkdir /mnt/etc/astpk.d")
-    os.system(f"echo '{args[1]}' > /mnt/etc/astpk.d/astpk-part")
-    os.system(f"echo '0' > /mnt/etc/astpk.d/astpk-csnapshot")
-    os.system(f"echo '0' > /mnt/etc/astpk.d/astpk-cetc")
-    os.system(f"mkdir /mnt/usr/share/ast")
-    os.system(f"cp -r /mnt/var/lib/pacman/* /mnt/usr/share/ast")
-    os.system(f"sed -i s,\"#DBPath      = /var/lib/pacman/\",\"DBPath      = /usr/share/ast/\",g /mnt/etc/pacman.conf")
-
     # os information
     os.system(f"echo 'NAME=\"astOS\"' > /mnt/etc/os-release")
     os.system(f"echo 'PRETTY_NAME=\"astOS\"' >> /mnt/etc/os-release")
@@ -182,6 +168,32 @@ def main(args):
     os.system(f"echo 'DISTRIB_ID=\"astOS\"' > /mnt/etc/lsb-release")
     os.system(f"echo 'DISTRIB_RELEASE=\"rolling\"' >> /mnt/etc/lsb-release")
     os.system(f"echo 'DISTRIB_DESCRIPTION=astOS' >> /mnt/etc/lsb-release")
+
+    # ast configuration
+    os.system("echo '/.snapshots/ast/root /root none bind 0 0' >> /mnt/etc/fstab")
+    os.system("echo '/.snapshots/ast/tmp /tmp none bind 0 0' >> /mnt/etc/fstab")
+    astpart = to_uuid(args[1])
+    os.system(f"mkdir -p /mnt/usr/share/ast/db")
+    os.system(f"echo '0' > /mnt/usr/share/ast/snap")
+
+
+
+
+
+
+
+
+
+    
+    os.system("mkdir /mnt/etc/astpk.d")
+
+    os.system(f"echo '{args[1]}' > /mnt/etc/astpk.d/astpk-part")
+    os.system(f"echo '0' > /mnt/etc/astpk.d/astpk-csnapshot")
+    os.system(f"echo '0' > /mnt/etc/astpk.d/astpk-cetc")
+    os.system(f"mkdir /mnt/usr/share/ast")
+    os.system(f"cp -r /mnt/var/lib/pacman/* /mnt/usr/share/ast")
+    os.system(f"sed -i s,\"#DBPath      = /var/lib/pacman/\",\"DBPath      = /usr/share/ast/\",g /mnt/etc/pacman.conf")
+
       
     # --------------------------------------------------
     # 1.2 Post installation 
@@ -202,7 +214,7 @@ def main(args):
         clear()
         # timezone welcome message
         print(f'Timezone.\n\n')
-        print(f'Input desired timezone, if you're unsure type list to list all available.')
+        print(f'Input desired timezone, if you\'re unsure type list to list all available.')
         print(f'Default: {timezoneOption}\n\n')
         # capture input
         timezoneInput = input("> ")
@@ -220,7 +232,7 @@ def main(args):
         clear()
         # locale welcome message
         print(f'Locale.\n\n')
-        print(f'Input desired locale, if you're unsure type list to list all available.')
+        print(f'Input desired locale, if you\'re unsure type list to list all available.')
         print(f'Default: {localeOption}\n\n')
         # capture input
         localeInput = input("> ")
@@ -315,7 +327,7 @@ def main(args):
     os.system("echo {\\'name\\': \\'root\\', \\'children\\': [{\\'name\\': \\'0\\'}]} > /mnt/.snapshots/ast/fstree")
 
     # grub installation and configuration
-    os.system(f"arch-chroot /mnt sed -i s,Arch,AstOS,g /etc/default/grub")
+    os.system(f"arch-chroot /mnt sed -i s,Arch,astOS,g /etc/default/grub")
     os.system(f"arch-chroot /mnt grub-install {args[2]}")
     os.system(f"arch-chroot /mnt grub-mkconfig {args[2]} -o /boot/grub/grub.cfg")
     os.system("sed -i '0,/subvol=@/{s,subvol=@,subvol=@.snapshots/snapshot-tmp,g}' /mnt/boot/grub/grub.cfg")
@@ -326,7 +338,7 @@ def main(args):
 
     # btrfs post installation configuration 
     # take first "root" snapshot, this will be the foundation for all future clones
-    os.system("mkdir -p /mnt/root/images")
+    os.system("mkdir -p /mnt/.snapshots/ast/images")
     os.system("arch-chroot /mnt btrfs sub set-default /.snapshots/rootfs/snapshot-tmp")
     os.system("arch-chroot /mnt ln -s /.snapshots/ast /var/lib/ast")
     # take initial snapshot 
