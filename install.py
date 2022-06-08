@@ -58,7 +58,7 @@ def main(args):
             clear()
             # pactrap welcome message
             print(f'Base Packages.\n\n')
-            print(f'Some mandatory packages are included by default, they're necessary for astOS to function.')
+            print(f'Some mandatory packages are included by default, they\'re necessary for astOS to function.')
             print(f'Value: {pacstrapOptionsMandatory}\n\n')
             print(f'Default packages, you can override those here if you wish to do so.')
             print(f'Value: {pacstrapOptions}\n\n')           
@@ -194,7 +194,7 @@ def main(args):
         clear()
         # timezone welcome message
         print(f'Timezone.\n\n')
-        print(f'Input desired timezone, if you're unsure type list to list all available.')
+        print(f'Input desired timezone, if you\'re unsure type list to list all available.')
         print(f'Default: {timezoneOption}\n\n')
         # capture input
         timezoneInput = input("> ")
@@ -212,7 +212,7 @@ def main(args):
         clear()
         # locale welcome message
         print(f'Locale.\n\n')
-        print(f'Input desired locale, if you're unsure type list to list all available.')
+        print(f'Input desired locale, if you\'re unsure type list to list all available.')
         print(f'Default: {localeOption}\n\n')
         # capture input
         localeInput = input("> ")
