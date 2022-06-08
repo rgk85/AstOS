@@ -2,18 +2,14 @@
 import os
 import time
 import sys
-import subprocess
 
 # TODO: the installer needs a proper rewrite - in progress
 
 args = list(sys.argv)
+# startup-service; startup; astpk-part; astpk-cbase; astpk-csnapshot; astpk-cetc; astpk-firstboot
 
 def clear():
     os.system("clear")
-
-def to_uuid(part):
-    uuid = str(subprocess.check_output(f"blkid -s UUID -o value {part}", shell=True))
-    return uuid.replace("b'","").replace('"',"").replace("\\n'","")
 
 def main(args):
     # default pacstrap options
@@ -33,7 +29,7 @@ def main(args):
         #print("Welcome to the astOS installer!\n\n\n\n\n")
         #print("Select installation profile:\n1. Minimal install - suitable for embedded devices or servers\n2. Desktop install (Gnome) - suitable for workstations\n3. Desktop install (KDE Plasma)\n0. Custom Test")
         # installation profile welcome message
-        print(f'Welcome to the AstOS installer!\n\n')
+        print(f'Welcome to the astOS installer!\n\n')
         print(f'Select installation profile:')
         print(f'1. Minimal install - suitable for embedded devices or servers')
         print(f'2. Desktop install (Gnome) - suitable for workstations')
@@ -62,7 +58,7 @@ def main(args):
             clear()
             # pactrap welcome message
             print(f'Base Packages.\n\n')
-            print(f'Some mandatory packages are included by default, they\'re necessary for astOS to function.')
+            print(f'Some mandatory packages are included by default, they're necessary for astOS to function.')
             print(f'Value: {pacstrapOptionsMandatory}\n\n')
             print(f'Default packages, you can override those here if you wish to do so.')
             print(f'Value: {pacstrapOptions}\n\n')           
@@ -97,9 +93,8 @@ def main(args):
     # - os information
     # --------------------------------------------------
 
-    # update pacman and installation
-    os.system("pacman -S --noconfirm archlinux-keyring")
-    #os.system("pacman --noconfirm -Sy")
+    # update installation
+    os.system("pacman --noconfirm -Sy")
     
     # set btrfs format on root partition
     os.system(f"mkfs.btrfs -f {args[1]}")
@@ -113,9 +108,9 @@ def main(args):
     # mount root partition
     os.system(f"mount {args[1]} /mnt")
     
-    # btrfs directories - the order of the values must be aligned, mounting will be incorrect if not.
-    btrfsDirectories = ["@","@.snapshots","@home","@var","@etc","@boot"]
-    mountDirectories = ["",".snapshots","home","var","etc","boot"]
+    # btrfs directories - the order of the values must be alined, mounting will be incorrect if not.
+    btrfsDirectories = ["@","@.etc","@.snapshots","@home","@tmp","@root","@.var","@var","@etc","@boot","@.boot"]
+    mountDirectories = ["",".etc",".snapshots","home","tmp","root",".var","var","etc","boot",".boot"]
    
     # create all btrfs directories in /mnt
     for btrfsDirectory in btrfsDirectories:
@@ -135,10 +130,6 @@ def main(args):
         os.system(f"mkdir /mnt/{mountDirectory}")
         os.system(f"mount {args[1]} -o subvol={btrfsDirectories[mountDirectories.index(mountDirectory)]},{btrfsMountOptions} /mnt/{mountDirectory}")
     
-    # create sub folder structure 
-    os.system("mkdir -p /mnt/{tmp,root}")
-    os.system("mkdir -p /mnt/.snapshots/{rootfs,etc,var,boot,tmp,root}")
-
     # create efi directory and mount (if we're using that), include efibootmgr in our initial package installation
     if efi:
         os.system("mkdir /mnt/boot/efi")
@@ -149,44 +140,16 @@ def main(args):
     os.system(f"pacstrap /mnt {pacstrapOptionsMandatory} {pacstrapOptions} {pacstrapOptionsEfi}")
     
     # add btrfs configuration to fstab
-    os.system(f"echo 'UUID=\"{to_uuid(args[1])}\" / btrfs subvol=@,{btrfsMountOptions},ro 0 0' > /mnt/etc/fstab")
+    os.system(f"echo '{args[1]} / btrfs subvol=@,{btrfsMountOptions},ro 0 0' > /mnt/etc/fstab")
     # add all subvolumnes
     for mountDirectory in mountDirectories:
-        os.system(f"echo 'UUID=\"{to_uuid(args[1])}\" /{mountDirectory} btrfs subvol=@{mountDirectory},{btrfsMountOptions} 0 0' >> /mnt/etc/fstab")
+        os.system(f"echo '{args[1]} /{mountDirectory} btrfs subvol=@{mountDirectory},{btrfsMountOptions} 0 0' >> /mnt/etc/fstab")
     # add efi 
     if efi:
-        os.system(f"echo 'UUID=\"{to_uuid(args[3])}\" /boot/efi vfat umask=0077 0 2' >> /mnt/etc/fstab")
-
-    # os information
-    os.system(f"echo 'NAME=\"astOS\"' > /mnt/etc/os-release")
-    os.system(f"echo 'PRETTY_NAME=\"astOS\"' >> /mnt/etc/os-release")
-    os.system(f"echo 'ID=astos' >> /mnt/etc/os-release")
-    os.system(f"echo 'BUILD_ID=rolling' >> /mnt/etc/os-release")
-    os.system(f"echo 'ANSI_COLOR=\"38;2;23;147;209\"' >> /mnt/etc/os-release")
-    os.system(f"echo 'HOME_URL=\"https://github.com/astos\"' >> /mnt/etc/os-release")
-    os.system(f"echo 'LOGO=astos-logo' >> /mnt/etc/os-release")
-    os.system(f"echo 'DISTRIB_ID=\"astOS\"' > /mnt/etc/lsb-release")
-    os.system(f"echo 'DISTRIB_RELEASE=\"rolling\"' >> /mnt/etc/lsb-release")
-    os.system(f"echo 'DISTRIB_DESCRIPTION=astOS' >> /mnt/etc/lsb-release")
+        os.system(f"echo '{args[3]} /boot/efi vfat umask=0077 0 2' >> /mnt/etc/fstab")
 
     # ast configuration
-    os.system("echo '/.snapshots/ast/root /root none bind 0 0' >> /mnt/etc/fstab")
-    os.system("echo '/.snapshots/ast/tmp /tmp none bind 0 0' >> /mnt/etc/fstab")
-    astpart = to_uuid(args[1])
-    os.system(f"mkdir -p /mnt/usr/share/ast/db")
-    os.system(f"echo '0' > /mnt/usr/share/ast/snap")
-
-
-
-
-
-
-
-
-
-    
     os.system("mkdir /mnt/etc/astpk.d")
-
     os.system(f"echo '{args[1]}' > /mnt/etc/astpk.d/astpk-part")
     os.system(f"echo '0' > /mnt/etc/astpk.d/astpk-csnapshot")
     os.system(f"echo '0' > /mnt/etc/astpk.d/astpk-cetc")
@@ -194,6 +157,17 @@ def main(args):
     os.system(f"cp -r /mnt/var/lib/pacman/* /mnt/usr/share/ast")
     os.system(f"sed -i s,\"#DBPath      = /var/lib/pacman/\",\"DBPath      = /usr/share/ast/\",g /mnt/etc/pacman.conf")
 
+    # os information
+    os.system(f"echo 'NAME=\"astOS\"' > /mnt/etc/os-release")
+    os.system(f"echo 'PRETTY_NAME=\"astOS\"' >> /mnt/etc/os-release")
+    os.system(f"echo 'ID=astos' >> /mnt/etc/os-release")
+    os.system(f"echo 'BUILD_ID=rolling' >> /mnt/etc/os-release")
+    os.system(f"echo 'ANSI_COLOR=\"38;2;23;147;209\"' >> /mnt/etc/os-release")
+    os.system(f"echo 'HOME_URL=\"https://github.com/CuBeRJAN/astOS\"' >> /mnt/etc/os-release")
+    os.system(f"echo 'LOGO=astos-logo' >> /mnt/etc/os-release")
+    os.system(f"echo 'DISTRIB_ID=\"astOS\"' > /mnt/etc/lsb-release")
+    os.system(f"echo 'DISTRIB_RELEASE=\"rolling\"' >> /mnt/etc/lsb-release")
+    os.system(f"echo 'DISTRIB_DESCRIPTION=astOS' >> /mnt/etc/lsb-release")
       
     # --------------------------------------------------
     # 1.2 Post installation 
@@ -214,7 +188,7 @@ def main(args):
         clear()
         # timezone welcome message
         print(f'Timezone.\n\n')
-        print(f'Input desired timezone, if you\'re unsure type list to list all available.')
+        print(f'Input desired timezone, if you're unsure type list to list all available.')
         print(f'Default: {timezoneOption}\n\n')
         # capture input
         timezoneInput = input("> ")
@@ -232,7 +206,7 @@ def main(args):
         clear()
         # locale welcome message
         print(f'Locale.\n\n')
-        print(f'Input desired locale, if you\'re unsure type list to list all available.')
+        print(f'Input desired locale, if you're unsure type list to list all available.')
         print(f'Default: {localeOption}\n\n')
         # capture input
         localeInput = input("> ")
@@ -317,14 +291,13 @@ def main(args):
     os.system(f"arch-chroot /mnt hwclock --systohc")
 
     # apply fstab post installation configuration
-    os.system("sed -i '0,/@/{s,@,@.snapshots/rootfs/snapshot-tmp,}' /mnt/etc/fstab")
-    os.system("sed -i '0,/@etc/{s,@etc,@.snapshots/etc/etc-tmp,}' /mnt/etc/fstab")
-    os.system("sed -i '0,/@boot/{s,@boot,@.snapshots/boot/boot-tmp,}' /mnt/etc/fstab")
+    os.system("sed -i '0,/@/{s,@,@.snapshots/snapshot-tmp,}' /mnt/etc/fstab")
+    os.system("sed -i '0,/@etc/{s,@etc,@.etc/etc-tmp,}' /mnt/etc/fstab")
+    os.system("sed -i '0,/@boot/{s,@boot,@.boot/boot-tmp,}' /mnt/etc/fstab")
 
     # initial default snapshot tree configuration
     os.system("mkdir -p /mnt/var/astpk")
-    os.system("mkdir -p /mnt/.snapshots/{ast,boot,etc,rootfs,var}")
-    os.system("echo {\\'name\\': \\'root\\', \\'children\\': [{\\'name\\': \\'0\\'}]} > /mnt/.snapshots/ast/fstree")
+    os.system("echo {\\'name\\': \\'root\\', \\'children\\': [{\\'name\\': \\'0\\'}]} > /mnt/var/astpk/fstree")
 
     # grub installation and configuration
     os.system(f"arch-chroot /mnt sed -i s,Arch,astOS,g /etc/default/grub")
@@ -333,33 +306,31 @@ def main(args):
     os.system("sed -i '0,/subvol=@/{s,subvol=@,subvol=@.snapshots/snapshot-tmp,g}' /mnt/boot/grub/grub.cfg")
 
     # ast tool configuration (copy and make executable)
-    os.system("cp ./astpk.py /mnt/usr/local/sbin/ast")
-    os.system("arch-chroot /mnt chmod +x /usr/local/sbin/ast")
+    os.system("cp ./astpk.py /mnt/usr/bin/ast")
+    os.system("arch-chroot /mnt chmod +x /usr/bin/ast")
 
     # btrfs post installation configuration 
     # take first "root" snapshot, this will be the foundation for all future clones
-    os.system("mkdir -p /mnt/.snapshots/ast/images")
-    os.system("arch-chroot /mnt btrfs sub set-default /.snapshots/rootfs/snapshot-tmp")
-    os.system("arch-chroot /mnt ln -s /.snapshots/ast /var/lib/ast")
+    os.system("mkdir -p /mnt/root/images")
+    os.system("arch-chroot /mnt btrfs sub set-default /.snapshots/snapshot-tmp")
     # take initial snapshot 
-    os.system("btrfs sub snap -r /mnt /mnt/.snapshots/rootfs/snapshot-0")
+    os.system("btrfs sub snap -r /mnt /mnt/.snapshots/snapshot-0")
     # create additional subvolumes
-    os.system("btrfs sub create /mnt/.snapshots/etc/etc-tmp")
-    os.system("btrfs sub create /mnt/.snapshots/var/var-tmp")
-    os.system("btrfs sub create /mnt/.snapshots/boot/boot-tmp")
+    os.system("btrfs sub create /mnt/.etc/etc-tmp")
+    os.system("btrfs sub create /mnt/.var/var-tmp")
+    os.system("btrfs sub create /mnt/.boot/boot-tmp")
     # create pacman and systemd directories in subvolumes    
-    os.system("mkdir -p /mnt/.snapshots/var/var-tmp/lib/{pacman,systemd}")
+    os.system("mkdir -p /mnt/.var/var-tmp/lib/pacman")
+    os.system("mkdir -p /mnt/.var/var-tmp/lib/systemd")
     # copy to tmp pacman and systemd directories
-    os.system("cp --reflink=auto -r /mnt/var/lib/pacman/* /mnt/.snapshots/var/var-tmp/lib/pacman/")
-    os.system("cp --reflink=auto -r /mnt/var/lib/systemd/* /mnt/.snapshots/var/var-tmp/lib/systemd/")
-    os.system("cp --reflink=auto -r /mnt/boot/* /mnt/.snapshots/boot/boot-tmp")
-    os.system("cp --reflink=auto -r /mnt/etc/* /mnt/.snapshots/etc/etc-tmp")
+    os.system("cp --reflink=auto -r /mnt/var/lib/pacman/* /mnt/.var/var-tmp/lib/pacman/")
+    os.system("cp --reflink=auto -r /mnt/var/lib/systemd/* /mnt/.var/var-tmp/lib/systemd/")
+    os.system("cp --reflink=auto -r /mnt/boot/* /mnt/.boot/boot-tmp")
+    os.system("cp --reflink=auto -r /mnt/etc/* /mnt/.etc/etc-tmp")
     # take snapshots of var, etc and boot
-    os.system("btrfs sub snap -r /mnt/.snapshots/var/var-tmp /mnt/.snapshots/var/var-0")
-    os.system("btrfs sub snap -r /mnt/.snapshots/boot/boot-tmp /mnt/.snapshots/boot/boot-0")
-    os.system("btrfs sub snap -r /mnt/.snapshots/etc/etc-tmp /mnt/.snapshots/etc/etc-0")
-    # add to ast configuration
-    os.system(f"echo '{astpart}' > /mnt/.snapshots/ast/part")
+    os.system("btrfs sub snap -r /mnt/.var/var-tmp /mnt/.var/var-0")
+    os.system("btrfs sub snap -r /mnt/.boot/boot-tmp /mnt/.boot/boot-0")
+    os.system("btrfs sub snap -r /mnt/.etc/etc-tmp /mnt/.etc/etc-0")
 
     # --------------------------------------------------
     # 1.4 Desktop installation 
@@ -368,15 +339,15 @@ def main(args):
 
     # add new snapshot tree if desktop is required
     if desktopInstall:
-        os.system("echo {\\'name\\': \\'root\\', \\'children\\': [{\\'name\\': \\'0\\'},{\\'name\\': \\'1\\'}]} > /mnt/.snapshots/ast/fstree")
-        os.system(f"echo '{astpart}' > /mnt/.snapshots/ast/part")
-   # desktop specific installation
+        os.system("echo {\\'name\\': \\'root\\', \\'children\\': [{\\'name\\': \\'0\\'},{\\'name\\': \\'1\\'}]} > /mnt/var/astpk/fstree")
+    # desktop specific installation
     if desktopInstall == "2":
         DesktopGnome()
     elif desktopInstall == "3":
         DesktopKde()
     else:
-        os.system("btrfs sub snap /mnt/.snapshots/rootfs/snapshot-0 /mnt/.snapshots/rootfs/snapshot-tmp")
+        os.system("btrfs sub snap /mnt/.snapshots/snapshot-0 /mnt/.snapshots/snapshot-tmp")
+
 
     # --------------------------------------------------
     # 1.5 Installation cleanup
@@ -384,34 +355,35 @@ def main(args):
     # - copy to snapshots
     # --------------------------------------------------
 
-    # copy and empty root and tmp
-    os.system("cp -r /mnt/root/. /mnt/.snapshots/root/")
-    os.system("cp -r /mnt/tmp/. /mnt/.snapshots/tmp/")
-    os.system("rm -rf /mnt/root/*")
-    os.system("rm -rf /mnt/tmp/*")
-
     # unmount /boot/efi
     if efi:
         os.system("umount /mnt/boot/efi")
 
-    # unmount /mnt/boot and cleanup
+    # unmount /mnt/{boot,etc}
     os.system("umount /mnt/boot")
-    os.system(f"mount {args[1]} -o subvol=@boot,{btrfsMountOptions} /mnt/.snapshots/boot/boot-tmp")
-    os.system("cp --reflink=auto -r /mnt/.snapshots/boot/boot-tmp/* /mnt/boot")
-    # unmount /mnt/etc and cleanup
-    os.system("umount /mnt/etc") 
-    os.system(f"mount {args[1]} -o subvol=@etc,{btrfsMountOptions} /mnt/.snapshots/etc/etc-tmp")
-    os.system("cp --reflink=auto -r /mnt/.snapshots/etc/etc-tmp/* /mnt/etc")
+    os.system("umount /mnt/etc")
+
+    # create {boot,etc}-tmp directories
+    os.system("mkdir /mnt/.boot/boot-tmp")
+    os.system("mkdir /mnt/.etc/etc-tmp") 
+
+    # mount {boot,etc}-tmp using btrfs
+    os.system(f"mount {args[1]} -o subvol=@boot,{btrfsMountOptions} /mnt/.boot/boot-tmp")
+    os.system(f"mount {args[1]} -o subvol=@etc,{btrfsMountOptions} /mnt/.etc/etc-tmp")
+
+    # copy to {boot,etc}
+    os.system("cp --reflink=auto -r /mnt/.boot/boot-tmp/* /mnt/boot")
+    os.system("cp --reflink=auto -r /mnt/.etc/etc-tmp/* /mnt/etc")
 
     # copy to snapshot-tmp (snapshot number determined by desktopInstall value)
     if desktopInstall:
-        os.system("cp --reflink=auto -r /mnt/.snapshots/etc/etc-1/* /mnt/.snapshots/rootfs/snapshot-tmp/etc")
-        os.system("cp --reflink=auto -r /mnt/.snapshots/var/var-1/* /mnt/.snapshots/rootfs/snapshot-tmp/var")
-        os.system("cp --reflink=auto -r /mnt/.snapshots/boot/boot-1/* /mnt/.snapshots/rootfs/snapshot-tmp/boot")
+        os.system("cp --reflink=auto -r /mnt/.etc/etc-1/* /mnt/.snapshots/snapshot-tmp/etc")
+        os.system("cp --reflink=auto -r /mnt/.var/var-1/* /mnt/.snapshots/snapshot-tmp/var")
+        os.system("cp --reflink=auto -r /mnt/.boot/boot-1/* /mnt/.snapshots/snapshot-tmp/boot")
     else:
-        os.system("cp --reflink=auto -r /mnt/.snapshots/etc/etc-0/* /mnt/.snapshots/rootfs/snapshot-tmp/etc")
-        os.system("cp --reflink=auto -r /mnt/.snapshots/var/var-0/* /mnt/.snapshots/rootfs/snapshot-tmp/var")
-        os.system("cp --reflink=auto -r /mnt/.snapshots/boot/boot-0/* /mnt/.snapshots/rootfs/snapshot-tmp/boot")
+        os.system("cp --reflink=auto -r /mnt/.etc/etc-0/* /mnt/.snapshots/snapshot-tmp/etc")
+        os.system("cp --reflink=auto -r /mnt/.var/var-0/* /mnt/.snapshots/snapshot-tmp/var")
+        os.system("cp --reflink=auto -r /mnt/.boot/boot-0/* /mnt/.snapshots/snapshot-tmp/boot")
 
     # unmount /mnt
     os.system("umount -R /mnt")
@@ -429,7 +401,8 @@ def main(args):
     
     
 def DesktopGnome():
-    os.system(f"echo '1' > /mnt/usr/share/ast/snap")
+    os.system(f"echo '1' > /mnt/etc/astpk.d/astpk-csnapshot")
+    os.system(f"echo '1' > /mnt/etc/astpk.d/astpk-cetc")
     os.system("pacstrap /mnt flatpak gnome gnome-extra gnome-themes-extra gdm pipewire pipewire-pulse sudo")
     clear()
     print("Enter username (all lowercase, max 8 letters)")
@@ -440,7 +413,6 @@ def DesktopGnome():
         if reply.casefold() == "y":
             break
         else:
-            clear()
             print("Enter username (all lowercase, max 8 letters)")
             username = input("> ")
     os.system(f"arch-chroot /mnt useradd {username}")
@@ -451,8 +423,8 @@ def DesktopGnome():
         if reply.casefold() == "y":
             break
         else:
-            clear()
             os.system(f"arch-chroot /mnt passwd {username}")
+            
     os.system(f"arch-chroot /mnt usermod -aG audio,input,video,wheel {username}")
     os.system(f"arch-chroot /mnt passwd -l root")
     os.system(f"chmod +w /mnt/etc/sudoers")
@@ -462,27 +434,29 @@ def DesktopGnome():
     os.system(f"echo 'export XDG_RUNTIME_DIR=\"/run/user/1000\"' >> /home/{username}/.bashrc")
     os.system(f"arch-chroot /mnt chown -R {username} /home/{username}")
     os.system(f"arch-chroot /mnt systemctl enable gdm")
-    os.system(f"cp -r /mnt/var/lib/pacman/* /mnt/usr/share/ast/db")
-    os.system("btrfs sub snap -r /mnt /mnt/.snapshots/rootfs/snapshot-1")
-    os.system("btrfs sub del /mnt/.snapshots/etc/etc-tmp")
-    os.system("btrfs sub del /mnt/.snapshots/var/var-tmp")
-    os.system("btrfs sub del /mnt/.snapshots/boot/boot-tmp")
-    os.system("btrfs sub create /mnt/.snapshots/etc/etc-tmp")
-    os.system("btrfs sub create /mnt/.snapshots/var/var-tmp")
-    os.system("btrfs sub create /mnt/.snapshots/boot/boot-tmp")
-    os.system("mkdir -p /mnt/.snapshots/var/var-tmp/lib/{pacman,systemd}")
-    os.system("cp --reflink=auto -r /mnt/var/lib/pacman/* /mnt/.snapshots/var/var-tmp/lib/pacman/")
-    os.system("cp --reflink=auto -r /mnt/var/lib/systemd/* /mnt/.snapshots/var/var-tmp/lib/systemd/")
-    os.system("cp --reflink=auto -r /mnt/boot/* /mnt/.snapshots/boot/boot-tmp")
-    os.system("cp --reflink=auto -r /mnt/etc/* /mnt/.snapshots/etc/etc-tmp")
-    os.system("btrfs sub snap -r /mnt/.snapshots/var/var-tmp /mnt/.snapshots/var/var-1")
-    os.system("btrfs sub snap -r /mnt/.snapshots/boot/boot-tmp /mnt/.snapshots/boot/boot-1")
-    os.system("btrfs sub snap -r /mnt/.snapshots/etc/etc-tmp /mnt/.snapshots/etc/etc-1")
-    os.system("btrfs sub snap /mnt/.snapshots/rootfs/snapshot-1 /mnt/.snapshots/rootfs/snapshot-tmp")
+    os.system(f"cp -r /mnt/var/lib/pacman/* /mnt/usr/share/ast")
 
+    os.system("btrfs sub snap -r /mnt /mnt/.snapshots/snapshot-1")
+    os.system("btrfs sub del /mnt/.etc/etc-tmp")
+    os.system("btrfs sub del /mnt/.var/var-tmp")
+    os.system("btrfs sub del /mnt/.boot/boot-tmp")
+    os.system("btrfs sub create /mnt/.etc/etc-tmp")
+    os.system("btrfs sub create /mnt/.var/var-tmp")
+    os.system("btrfs sub create /mnt/.boot/boot-tmp")
+    #    os.system("cp --reflink=auto -r /mnt/var/* /mnt/.var/var-tmp")
+    os.system("mkdir -p /mnt/.var/var-tmp/lib/{pacman,systemd}")
+    os.system("cp --reflink=auto -r /mnt/var/lib/pacman/* /mnt/.var/var-tmp/lib/pacman/")
+    os.system("cp --reflink=auto -r /mnt/var/lib/systemd/* /mnt/.var/var-tmp/lib/systemd/")
+    os.system("cp --reflink=auto -r /mnt/boot/* /mnt/.boot/boot-tmp")
+    os.system("cp --reflink=auto -r /mnt/etc/* /mnt/.etc/etc-tmp")
+    os.system("btrfs sub snap -r /mnt/.var/var-tmp /mnt/.var/var-1")
+    os.system("btrfs sub snap -r /mnt/.boot/boot-tmp /mnt/.boot/boot-1")
+    os.system("btrfs sub snap -r /mnt/.etc/etc-tmp /mnt/.etc/etc-1")
+    os.system("btrfs sub snap /mnt/.snapshots/snapshot-1 /mnt/.snapshots/snapshot-tmp")
 
 def DesktopKde():
-    os.system(f"echo '1' > /mnt/usr/share/ast/snap")
+    os.system(f"echo '1' > /mnt/etc/astpk.d/astpk-csnapshot")
+    os.system(f"echo '1' > /mnt/etc/astpk.d/astpk-cetc")
     os.system("pacstrap /mnt flatpak plasma xorg kde-applications sddm pipewire pipewire-pulse sudo")
     clear()
     print("Enter username (all lowercase, max 8 letters)")
@@ -493,7 +467,6 @@ def DesktopKde():
         if reply.casefold() == "y":
             break
         else:
-            clear()
             print("Enter username (all lowercase, max 8 letters)")
             username = input("> ")
     os.system(f"arch-chroot /mnt useradd {username}")
@@ -504,7 +477,6 @@ def DesktopKde():
         if reply.casefold() == "y":
             break
         else:
-            clear()
             os.system(f"arch-chroot /mnt passwd {username}")
     os.system(f"arch-chroot /mnt usermod -aG audio,input,video,wheel {username}")
     os.system(f"arch-chroot /mnt passwd -l root")
@@ -517,23 +489,24 @@ def DesktopKde():
     os.system(f"echo 'export XDG_RUNTIME_DIR=\"/run/user/1000\"' >> /home/{username}/.bashrc")
     os.system(f"arch-chroot /mnt chown -R {username} /home/{username}")
     os.system(f"arch-chroot /mnt systemctl enable sddm")
-    os.system(f"cp -r /mnt/var/lib/pacman/* /mnt/usr/share/ast/db")
-    os.system("btrfs sub snap -r /mnt /mnt/.snapshots/rootfs/snapshot-1")
-    os.system("btrfs sub del /mnt/.snapshots/etc/etc-tmp")
-    os.system("btrfs sub del /mnt/.snapshots/var/var-tmp")
-    os.system("btrfs sub del /mnt/.snapshots/boot/boot-tmp")
-    os.system("btrfs sub create /mnt/.snapshots/etc/etc-tmp")
-    os.system("btrfs sub create /mnt/.snapshots/var/var-tmp")
-    os.system("btrfs sub create /mnt/.snapshots/boot/boot-tmp")
-    os.system("mkdir -p /mnt/.snapshots/var/var-tmp/lib/{pacman,systemd}")
-    os.system("cp --reflink=auto -r /mnt/var/lib/pacman/* /mnt/.snapshots/var/var-tmp/lib/pacman/")
-    os.system("cp --reflink=auto -r /mnt/var/lib/systemd/* /mnt/.snapshots/var/var-tmp/lib/systemd/")
-    os.system("cp --reflink=auto -r /mnt/boot/* /mnt/.snapshots/boot/boot-tmp")
-    os.system("cp --reflink=auto -r /mnt/etc/* /mnt/.snapshots/etc/etc-tmp")
-    os.system("btrfs sub snap -r /mnt/.snapshots/var/var-tmp /mnt/.snapshots/var/var-1")
-    os.system("btrfs sub snap -r /mnt/.snapshots/boot/boot-tmp /mnt/.snapshots/boot/boot-1")
-    os.system("btrfs sub snap -r /mnt/.snapshots/etc/etc-tmp /mnt/.snapshots/etc/etc-1")
-    os.system("btrfs sub snap /mnt/.snapshots/rootfs/snapshot-1 /mnt/.snapshots/rootfs/snapshot-tmp")
+    os.system(f"cp -r /mnt/var/lib/pacman/* /mnt/usr/share/ast")
 
+    os.system("btrfs sub snap -r /mnt /mnt/.snapshots/snapshot-1")
+    os.system("btrfs sub del /mnt/.etc/etc-tmp")
+    os.system("btrfs sub del /mnt/.var/var-tmp")
+    os.system("btrfs sub del /mnt/.boot/boot-tmp")
+    os.system("btrfs sub create /mnt/.etc/etc-tmp")
+    os.system("btrfs sub create /mnt/.var/var-tmp")
+    os.system("btrfs sub create /mnt/.boot/boot-tmp")
+    #    os.system("cp --reflink=auto -r /mnt/var/* /mnt/.var/var-tmp")
+    os.system("mkdir -p /mnt/.var/var-tmp/lib/{pacman,systemd}")
+    os.system("cp --reflink=auto -r /mnt/var/lib/pacman/* /mnt/.var/var-tmp/lib/pacman/")
+    os.system("cp --reflink=auto -r /mnt/var/lib/systemd/* /mnt/.var/var-tmp/lib/systemd/")
+    os.system("cp --reflink=auto -r /mnt/boot/* /mnt/.boot/boot-tmp")
+    os.system("cp --reflink=auto -r /mnt/etc/* /mnt/.etc/etc-tmp")
+    os.system("btrfs sub snap -r /mnt/.var/var-tmp /mnt/.var/var-1")
+    os.system("btrfs sub snap -r /mnt/.boot/boot-tmp /mnt/.boot/boot-1")
+    os.system("btrfs sub snap -r /mnt/.etc/etc-tmp /mnt/.etc/etc-1")
+    os.system("btrfs sub snap /mnt/.snapshots/snapshot-1 /mnt/.snapshots/snapshot-tmp")
 
 main(args)
