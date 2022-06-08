@@ -109,8 +109,8 @@ def main(args):
     os.system(f"mount {args[1]} /mnt")
     
     # btrfs directories - the order of the values must be alined, mounting will be incorrect if not.
-    btrfsDirectories = ["@","@.etc","@.snapshots","@home","@tmp","@root","@.var","@var","@etc","@boot","@.boot"]
-    mountDirectories = ["",".etc",".snapshots","home","tmp","root",".var","var","etc","boot",".boot"]
+    btrfsDirectories = ["@","@.snapshots","@home","@var","@etc","@boot"]
+    mountDirectories = ["",".snapshots","home","var","etc","boot"]
    
     # create all btrfs directories in /mnt
     for btrfsDirectory in btrfsDirectories:
@@ -123,7 +123,8 @@ def main(args):
     os.system(f"mount {args[1]} -o subvol=@,{btrfsMountOptions} /mnt")
     
     # create additional directories
-    os.system("mkdir /mnt/{boot,etc,var}")
+    os.system("mkdir -p /mnt/{tmp,root}")
+    os.system("mkdir -p /mnt/.snapshots/{rootfs,etc,var,boot,tmp,root}")
     
     # mount additional directories using btrfs
     for mountDirectory in mountDirectories:
@@ -147,6 +148,11 @@ def main(args):
     # add efi 
     if efi:
         os.system(f"echo '{args[3]} /boot/efi vfat umask=0077 0 2' >> /mnt/etc/fstab")
+
+    os.system("echo '/.snapshots/ast/root /root none bind 0 0' >> /mnt/etc/fstab")
+    os.system("echo '/.snapshots/ast/tmp /tmp none bind 0 0' >> /mnt/etc/fstab")
+    os.system(f"mkdir -p /mnt/usr/share/ast/db")
+    os.system(f"echo '0' > /mnt/usr/share/ast/snap")
 
     # ast configuration
     os.system("mkdir /mnt/etc/astpk.d")
@@ -291,46 +297,50 @@ def main(args):
     os.system(f"arch-chroot /mnt hwclock --systohc")
 
     # apply fstab post installation configuration
-    os.system("sed -i '0,/@/{s,@,@.snapshots/snapshot-tmp,}' /mnt/etc/fstab")
-    os.system("sed -i '0,/@etc/{s,@etc,@.etc/etc-tmp,}' /mnt/etc/fstab")
-    os.system("sed -i '0,/@boot/{s,@boot,@.boot/boot-tmp,}' /mnt/etc/fstab")
+    os.system("sed -i '0,/@/{s,@,@.snapshots/rootfs/snapshot-tmp,}' /mnt/etc/fstab")
+    os.system("sed -i '0,/@etc/{s,@etc,@.snapshots/etc/etc-tmp,}' /mnt/etc/fstab")
+    os.system("sed -i '0,/@boot/{s,@boot,@.snapshots/boot/boot-tmp,}' /mnt/etc/fstab")
 
     # initial default snapshot tree configuration
-    os.system("mkdir -p /mnt/var/astpk")
-    os.system("echo {\\'name\\': \\'root\\', \\'children\\': [{\\'name\\': \\'0\\'}]} > /mnt/var/astpk/fstree")
+    os.system("mkdir -p /mnt/.snapshots/ast/images")
+    os.system("arch-chroot /mnt btrfs sub set-default /.snapshots/rootfs/snapshot-tmp")
+    os.system("arch-chroot /mnt ln -s /.snapshots/ast /var/lib/ast")  
+    #os.system("mkdir -p /mnt/var/astpk")
+    os.system("echo {\\'name\\': \\'root\\', \\'children\\': [{\\'name\\': \\'0\\'}]} > /mnt/.snapshots/ast/fstree")
 
     # grub installation and configuration
     os.system(f"arch-chroot /mnt sed -i s,Arch,astOS,g /etc/default/grub")
     os.system(f"arch-chroot /mnt grub-install {args[2]}")
     os.system(f"arch-chroot /mnt grub-mkconfig {args[2]} -o /boot/grub/grub.cfg")
-    os.system("sed -i '0,/subvol=@/{s,subvol=@,subvol=@.snapshots/snapshot-tmp,g}' /mnt/boot/grub/grub.cfg")
+    os.system("sed -i '0,/subvol=@/{s,subvol=@,subvol=@.snapshots/rootfs/snapshot-tmp,g}' /mnt/boot/grub/grub.cfg")
 
     # ast tool configuration (copy and make executable)
-    os.system("cp ./astpk.py /mnt/usr/bin/ast")
-    os.system("arch-chroot /mnt chmod +x /usr/bin/ast")
+    os.system("cp ./astpk.py /mnt/usr/local/sbin/ast")
+    os.system("arch-chroot /mnt chmod +x /usr/local/sbin/ast")
 
     # btrfs post installation configuration 
     # take first "root" snapshot, this will be the foundation for all future clones
-    os.system("mkdir -p /mnt/root/images")
-    os.system("arch-chroot /mnt btrfs sub set-default /.snapshots/snapshot-tmp")
+    # os.system("mkdir -p /mnt/root/images")
+    # os.system("arch-chroot /mnt btrfs sub set-default /.snapshots/snapshot-tmp")
     # take initial snapshot 
-    os.system("btrfs sub snap -r /mnt /mnt/.snapshots/snapshot-0")
+    os.system("btrfs sub snap -r /mnt /mnt/.snapshots/rootfs/snapshot-0")
     # create additional subvolumes
-    os.system("btrfs sub create /mnt/.etc/etc-tmp")
-    os.system("btrfs sub create /mnt/.var/var-tmp")
-    os.system("btrfs sub create /mnt/.boot/boot-tmp")
+    os.system("btrfs sub create /mnt/.snapshots/etc/etc-tmp")
+    os.system("btrfs sub create /mnt/.snapshots/var/var-tmp")
+    os.system("btrfs sub create /mnt/.snapshots/boot/boot-tmp")
     # create pacman and systemd directories in subvolumes    
-    os.system("mkdir -p /mnt/.var/var-tmp/lib/pacman")
-    os.system("mkdir -p /mnt/.var/var-tmp/lib/systemd")
+    os.system("mkdir -p /mnt/.snapshots/var/var-tmp/lib/{pacman,systemd}")
     # copy to tmp pacman and systemd directories
-    os.system("cp --reflink=auto -r /mnt/var/lib/pacman/* /mnt/.var/var-tmp/lib/pacman/")
-    os.system("cp --reflink=auto -r /mnt/var/lib/systemd/* /mnt/.var/var-tmp/lib/systemd/")
-    os.system("cp --reflink=auto -r /mnt/boot/* /mnt/.boot/boot-tmp")
-    os.system("cp --reflink=auto -r /mnt/etc/* /mnt/.etc/etc-tmp")
+    os.system("cp --reflink=auto -r /mnt/var/lib/pacman/* /mnt/.snapshots/var/var-tmp/lib/pacman/")
+    os.system("cp --reflink=auto -r /mnt/var/lib/systemd/* /mnt/.snapshots/var/var-tmp/lib/systemd/")
+    os.system("cp --reflink=auto -r /mnt/boot/* /mnt/.snapshots/boot/boot-tmp")
+    os.system("cp --reflink=auto -r /mnt/etc/* /mnt/.snapshots/etc/etc-tmp")
     # take snapshots of var, etc and boot
-    os.system("btrfs sub snap -r /mnt/.var/var-tmp /mnt/.var/var-0")
-    os.system("btrfs sub snap -r /mnt/.boot/boot-tmp /mnt/.boot/boot-0")
-    os.system("btrfs sub snap -r /mnt/.etc/etc-tmp /mnt/.etc/etc-0")
+    os.system("btrfs sub snap -r /mnt/.snapshots/var/var-tmp /mnt/.snapshots/var/var-0")
+    os.system("btrfs sub snap -r /mnt/.snapshots/boot/boot-tmp /mnt/.snapshots/boot/boot-0")
+    os.system("btrfs sub snap -r /mnt/.snapshots/etc/etc-tmp /mnt/.snapshots/etc/etc-0")
+
+    os.system(f"echo '{astpart}' > /mnt/.snapshots/ast/part")
 
     # --------------------------------------------------
     # 1.4 Desktop installation 
@@ -339,7 +349,9 @@ def main(args):
 
     # add new snapshot tree if desktop is required
     if desktopInstall:
-        os.system("echo {\\'name\\': \\'root\\', \\'children\\': [{\\'name\\': \\'0\\'},{\\'name\\': \\'1\\'}]} > /mnt/var/astpk/fstree")
+        os.system("echo {\\'name\\': \\'root\\', \\'children\\': [{\\'name\\': \\'0\\'},{\\'name\\': \\'1\\'}]} > /mnt/.snapshots/ast/fstree")
+        os.system(f"echo '{astpart}' > /mnt/.snapshots/ast/part")
+
     # desktop specific installation
     if desktopInstall == "2":
         DesktopGnome()
@@ -355,35 +367,40 @@ def main(args):
     # - copy to snapshots
     # --------------------------------------------------
 
+    os.system("cp -r /mnt/root/. /mnt/.snapshots/root/")
+    os.system("cp -r /mnt/tmp/. /mnt/.snapshots/tmp/")
+    os.system("rm -rf /mnt/root/*")
+    os.system("rm -rf /mnt/tmp/*")
+
     # unmount /boot/efi
     if efi:
         os.system("umount /mnt/boot/efi")
 
     # unmount /mnt/{boot,etc}
     os.system("umount /mnt/boot")
-    os.system("umount /mnt/etc")
 
     # create {boot,etc}-tmp directories
     os.system("mkdir /mnt/.boot/boot-tmp")
     os.system("mkdir /mnt/.etc/etc-tmp") 
 
     # mount {boot,etc}-tmp using btrfs
-    os.system(f"mount {args[1]} -o subvol=@boot,{btrfsMountOptions} /mnt/.boot/boot-tmp")
-    os.system(f"mount {args[1]} -o subvol=@etc,{btrfsMountOptions} /mnt/.etc/etc-tmp")
+    os.system(f"mount {args[1]} -o subvol=@boot,{btrfsMountOptions} /mnt/.snapshots/boot/boot-tmp")
 
     # copy to {boot,etc}
-    os.system("cp --reflink=auto -r /mnt/.boot/boot-tmp/* /mnt/boot")
-    os.system("cp --reflink=auto -r /mnt/.etc/etc-tmp/* /mnt/etc")
+    os.system("cp --reflink=auto -r /mnt/.snapshots/boot/boot-tmp/* /mnt/boot")
+    os.system("umount /mnt/etc")
+    os.system(f"mount {args[1]} -o subvol=@etc,{btrfsMountOptions} /mnt/.snapshots/etc/etc-tmp")
+    os.system("cp --reflink=auto -r /mnt/.snapshots/etc/etc-tmp/* /mnt/etc")
 
     # copy to snapshot-tmp (snapshot number determined by desktopInstall value)
     if desktopInstall:
-        os.system("cp --reflink=auto -r /mnt/.etc/etc-1/* /mnt/.snapshots/snapshot-tmp/etc")
-        os.system("cp --reflink=auto -r /mnt/.var/var-1/* /mnt/.snapshots/snapshot-tmp/var")
-        os.system("cp --reflink=auto -r /mnt/.boot/boot-1/* /mnt/.snapshots/snapshot-tmp/boot")
+        os.system("cp --reflink=auto -r /mnt/.snapshots/etc/etc-1/* /mnt/.snapshots/rootfs/snapshot-tmp/etc")
+        os.system("cp --reflink=auto -r /mnt/.snapshots/var/var-1/* /mnt/.snapshots/rootfs/snapshot-tmp/var")
+        os.system("cp --reflink=auto -r /mnt/.snapshots/boot/boot-1/* /mnt/.snapshots/rootfs/snapshot-tmp/boot")
     else:
-        os.system("cp --reflink=auto -r /mnt/.etc/etc-0/* /mnt/.snapshots/snapshot-tmp/etc")
-        os.system("cp --reflink=auto -r /mnt/.var/var-0/* /mnt/.snapshots/snapshot-tmp/var")
-        os.system("cp --reflink=auto -r /mnt/.boot/boot-0/* /mnt/.snapshots/snapshot-tmp/boot")
+        os.system("cp --reflink=auto -r /mnt/.snapshots/etc/etc-0/* /mnt/.snapshots/rootfs/snapshot-tmp/etc")
+        os.system("cp --reflink=auto -r /mnt/.snapshots/var/var-0/* /mnt/.snapshots/rootfs/snapshot-tmp/var")
+        os.system("cp --reflink=auto -r /mnt/.snapshots/boot/boot-0/* /mnt/.snapshots/rootfs/snapshot-tmp/boot")
 
     # unmount /mnt
     os.system("umount -R /mnt")
