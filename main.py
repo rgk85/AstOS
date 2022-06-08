@@ -124,6 +124,7 @@ def main(args):
     os.system("sed -i '0,/@etc/{s,@etc,@.snapshots/etc/etc-tmp,}' /mnt/etc/fstab")
 #    os.system("sed -i '0,/@var/{s,@var,@.snapshots/var/var-tmp,}' /mnt/etc/fstab")
     os.system("sed -i '0,/@boot/{s,@boot,@.snapshots/boot/boot-tmp,}' /mnt/etc/fstab")
+    
     os.system("mkdir -p /mnt/.snapshots/ast/images")
     os.system("arch-chroot /mnt btrfs sub set-default /.snapshots/rootfs/snapshot-tmp")
 
@@ -152,21 +153,26 @@ def main(args):
     os.system(f"arch-chroot /mnt grub-install {args[2]}")
     os.system(f"arch-chroot /mnt grub-mkconfig {args[2]} -o /boot/grub/grub.cfg")
     os.system("sed -i '0,/subvol=@/{s,subvol=@,subvol=@.snapshots/rootfs/snapshot-tmp,g}' /mnt/boot/grub/grub.cfg")
+
     os.system("cp ./astpk.py /mnt/usr/local/sbin/ast")
     os.system("arch-chroot /mnt chmod +x /usr/local/sbin/ast")
+
     os.system("btrfs sub snap -r /mnt /mnt/.snapshots/rootfs/snapshot-0")
     os.system("btrfs sub create /mnt/.snapshots/etc/etc-tmp")
     os.system("btrfs sub create /mnt/.snapshots/var/var-tmp")
     os.system("btrfs sub create /mnt/.snapshots/boot/boot-tmp")
 #    os.system("cp --reflink=auto -r /mnt/var/* /mnt/.snapshots/var/var-tmp")
     os.system("mkdir -p /mnt/.snapshots/var/var-tmp/lib/{pacman,systemd}")
+
     os.system("cp --reflink=auto -r /mnt/var/lib/pacman/* /mnt/.snapshots/var/var-tmp/lib/pacman/")
     os.system("cp --reflink=auto -r /mnt/var/lib/systemd/* /mnt/.snapshots/var/var-tmp/lib/systemd/")
     os.system("cp --reflink=auto -r /mnt/boot/* /mnt/.snapshots/boot/boot-tmp")
     os.system("cp --reflink=auto -r /mnt/etc/* /mnt/.snapshots/etc/etc-tmp")
+
     os.system("btrfs sub snap -r /mnt/.snapshots/var/var-tmp /mnt/.snapshots/var/var-0")
     os.system("btrfs sub snap -r /mnt/.snapshots/boot/boot-tmp /mnt/.snapshots/boot/boot-0")
     os.system("btrfs sub snap -r /mnt/.snapshots/etc/etc-tmp /mnt/.snapshots/etc/etc-0")
+
     os.system(f"echo '{astpart}' > /mnt/.snapshots/ast/part")
 
     if DesktopInstall == 1:
