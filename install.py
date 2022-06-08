@@ -383,10 +383,6 @@ def main(args):
     # unmount /mnt/{boot,etc}
     os.system("umount /mnt/boot")
 
-    # create {boot,etc}-tmp directories
-    os.system("mkdir /mnt/.boot/boot-tmp")
-    os.system("mkdir /mnt/.etc/etc-tmp") 
-
     # mount {boot,etc}-tmp using btrfs
     os.system(f"mount {args[1]} -o subvol=@boot,{btrfsMountOptions} /mnt/.snapshots/boot/boot-tmp")
 
@@ -395,6 +391,11 @@ def main(args):
     os.system("umount /mnt/etc")
     os.system(f"mount {args[1]} -o subvol=@etc,{btrfsMountOptions} /mnt/.snapshots/etc/etc-tmp")
     os.system("cp --reflink=auto -r /mnt/.snapshots/etc/etc-tmp/* /mnt/etc")
+
+    os.system("mkdir -p /mnt/.snapshots/rootfs/snapshot-tmp/etc")
+    os.system("mkdir -p /mnt/.snapshots/rootfs/snapshot-tmp/var")
+    os.system("mkdir -p /mnt/.snapshots/rootfs/snapshot-tmp/boot")
+
 
     # copy to snapshot-tmp (snapshot number determined by desktopInstall value)
     if desktopInstall:
