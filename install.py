@@ -392,10 +392,8 @@ def main(args):
     os.system(f"mount {args[1]} -o subvol=@etc,{btrfsMountOptions} /mnt/.snapshots/etc/etc-tmp")
     os.system("cp --reflink=auto -r /mnt/.snapshots/etc/etc-tmp/* /mnt/etc")
 
-    os.system("mkdir -p /mnt/.snapshots/rootfs/snapshot-tmp/etc")
-    os.system("mkdir -p /mnt/.snapshots/rootfs/snapshot-tmp/var")
-    os.system("mkdir -p /mnt/.snapshots/rootfs/snapshot-tmp/boot")
-
+    # create additional folders
+    os.system("mkdir -p /mnt/.snapshots/rootfs/snapshot-tmp/{etc,var,boot}")
 
     # copy to snapshot-tmp (snapshot number determined by desktopInstall value)
     if desktopInstall:
