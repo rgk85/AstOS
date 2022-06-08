@@ -296,7 +296,7 @@ def main(args):
     # additional post installation configuration, no user interaction needed.
     os.system(f"arch-chroot /mnt hwclock --systohc")
 
-    
+
     os.system("mkdir -p /mnt/.snapshots/{ast,boot,etc,rootfs,var}")
 
     # apply fstab post installation configuration
@@ -343,7 +343,8 @@ def main(args):
     os.system("btrfs sub snap -r /mnt/.snapshots/boot/boot-tmp /mnt/.snapshots/boot/boot-0")
     os.system("btrfs sub snap -r /mnt/.snapshots/etc/etc-tmp /mnt/.snapshots/etc/etc-0")
 
-    os.system(f"echo '{astpart}' > /mnt/.snapshots/ast/part")
+    
+    os.system(f"echo '{args[1]}' > /mnt/.snapshots/ast/part")
 
     # --------------------------------------------------
     # 1.4 Desktop installation 
