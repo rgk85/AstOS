@@ -275,7 +275,7 @@ def main(args):
             break
    
     # services to enable
-    # os.system("arch-chroot /mnt systemctl enable NetworkManager")
+    os.system("arch-chroot /mnt systemctl enable NetworkManager")
 
     # --------------------------------------------------
     # 1.3 Post installation 
@@ -295,6 +295,9 @@ def main(args):
 
     # additional post installation configuration, no user interaction needed.
     os.system(f"arch-chroot /mnt hwclock --systohc")
+
+    
+    os.system("mkdir -p /mnt/.snapshots/{ast,boot,etc,rootfs,var}")
 
     # apply fstab post installation configuration
     os.system("sed -i '0,/@/{s,@,@.snapshots/rootfs/snapshot-tmp,}' /mnt/etc/fstab")
