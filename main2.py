@@ -75,7 +75,7 @@ def main(args):
         os.system("mkdir /mnt/boot/efi")
         os.system(f"mount {args[3]} /mnt/boot/efi")
 
-    os.system("pacstrap /mnt base-devel linux linux-firmware linux-firmware-marvell nano git htop intel-ucode reflector mesa networkmanager base btrfs-progs grub python3 python-anytree openssh xdg-user-dirs")
+    os.system("pacstrap /mnt base-devel linux linux-firmware linux-firmware-marvell nano git htop intel-ucode reflector mesa networkmanager base btrfs-progs grub python3 python-anytree openssh xdg-user-dirs arch-install-scripts")
 
     if efi:
         os.system("pacstrap /mnt efibootmgr")
